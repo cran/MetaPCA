@@ -81,7 +81,9 @@ MetaPCA <- function(DList, method=c("Angle","Eigen","RobustAngle","SparseAngle")
 	
 	if(is.null(lambda))
 		lambda <- rep(length(DListF)/sqrt(length(features)), nPC)
-	
+	else
+		lambda <- lambda * length(DListF) #to make lambda be comparable to usual spca 
+				
 	stopifnot(nPC==length(lambda) & nPC <= min(sapply(DListF, ncol)) - 1)
 	
 	rotation <- matrix(0, length(features), nPC)
@@ -115,7 +117,7 @@ MetaPCA <- function(DList, method=c("Angle","Eigen","RobustAngle","SparseAngle")
 		#Find convergence of Betas
 		while(it > 1 & diff > eps) {
 			BetasNew <- foreach(i=1:length(..DList), .combine=cbind) %do% {
-				z <- svd(t(..DList[[i]]) %*% ..DList[[i]] %*% Betas[,i], )
+				z <- svd(t(..DList[[i]]) %*% ..DList[[i]] %*% Betas[,i])
 				.alpha <- z$u %*% t(z$v)
 				
 				.beta <- drop(t(..DList[[i]]) %*% ..DList[[i]] %*% .alpha)
@@ -134,9 +136,10 @@ MetaPCA <- function(DList, method=c("Angle","Eigen","RobustAngle","SparseAngle")
 		}
 		
 		.chosen <- which(rowSums(abs(Betas))>0)
-		
+		if(length(.chosen)<1)
+			stop("lambda is too large. No features are left")
 		#Find Meta-PC which minimize in-between angles
-		.CovSum <- Reduce('+', lapply(1:length(..DList), function(i) Betas[.chosen,i] %*% t(Betas[.chosen,i])))
+		.CovSum <- Reduce('+', lapply(1:length(..DList), function(i) Betas[.chosen,i,drop=FALSE] %*% t(Betas[.chosen,i,drop=FALSE])))
 		.eig <- eigen(.CovSum, symmetric=TRUE)
 		
 		rotation[.chosen,k] <- .eig$vectors[,1] 
